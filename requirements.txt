@@ -1,4 +1,4 @@
-# 노트북은 Kaggle Notebook 환경에서 실행했다. 아래는 하한 버전만 적었다.
+# 참고: 노트북은 Kaggle Notebook 환경에서 실행했습니다.
 numpy
 pandas
 scipy
