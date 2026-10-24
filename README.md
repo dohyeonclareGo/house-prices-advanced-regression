@@ -2,7 +2,8 @@ English | [한국어](README.ko.md)
 
 # House Prices – Advanced Regression Techniques
 
-Predicting house sale prices in Ames, Iowa from 79 features. **Final public leaderboard: 0.11516** (log-price RMSE; target was 0.114).
+Predicting house sale prices in Ames, Iowa from 79 features. 
+**Final public leaderboard: 0.11516** (log-price RMSE).
 
 The result came from a blend of three models, a hybrid cost-approach model, and two hand-written rules based on the data. This repository records which changes reached the leaderboard and which did not, and the criteria used to decide.
 
