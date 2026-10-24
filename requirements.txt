@@ -1,0 +1,12 @@
+# 노트북은 Kaggle Notebook 환경에서 실행했다. 아래는 하한 버전만 적었다.
+numpy
+pandas
+scipy
+scikit-learn>=1.4   # cross_val_predict(params=...) 사용
+xgboost
+# notebooks/01, eda/ 에서만 사용
+lightgbm
+optuna
+matplotlib
+seaborn
+jupyter
