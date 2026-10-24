@@ -4,7 +4,7 @@
 
 미국 아이오와주 에임스(Ames)의 집값을 79개 피처로 예측해보는 프로젝트입니다. **최종 리더보드 점수는 0.11516**입니다(log 가격 RMSE).
 
-최종 결과는 XGBoost, SVR, 하이브리드 모델 세 개의 예측을 1/3씩 평균한 블렌드입니다. 하이브리드 모델은 부동산 감정평가의 원가법(집값 = 땅값 + 건물 면적 × 단가 × 품질 × 감가)으로 만든 구조 모델이 먼저 가격을 예측하고, Lasso가 그 오차만 보정하는 방식입니다. 여기에 데이터를 보고 만든 규칙 2개(Id 2550 특수 거래, 상업지역 코너 땅 6채)를 적용했습니다. 
+최종 결과는 XGBoost, SVR, 하이브리드 모델 두 개의 예측을 1/4씩 평균한 블렌드입니다. 하이브리드 모델은 부동산 감정평가의 원가법(집값 = 땅값 + 건물 면적 × 단가 × 품질 × 감가)으로 만든 구조 모델이 먼저 가격을 예측하고, 그 오차만 보정하는 방식입니다. 오차를 하나는 Lasso가, 다른 하나는 SVR이 학습합니다. 여기에 데이터를 보고 만든 규칙 2개(Id 2550 특수 거래, 상업지역 코너 땅 6채)를 적용했습니다.
 
 ## 문제 정의와 평가 지표
 
@@ -39,8 +39,12 @@
 - **v2 피처 정리**: Box-Cox, 순서형 인코딩 확대, 품질×면적, 희귀 더미 제거. 모두 거의 모든 집에 적용되는 변경입니다. Lasso CV가 0.1117에서 0.1093으로 좋아졌고(15번 중 15번 개선), 스택은 LB **0.11535**를 얻었습니다.
 - **v3**(구조 모델에 품질 제곱항 추가)는 LB 0.11713으로 기각했습니다. 제곱항은 train에 몇 채 없는 최고·최저 품질 구간에서 추정되어, test에서 예측이 흔들렸습니다.
 - **v4 하이브리드**: 원가법 구조 모델(땅값 + 건물 면적 × 단가 × 품질 × 감가)이 먼저 가격을 예측하고, Lasso는 그 잔차만 학습합니다. 하이브리드 단독 CV는 0.1054였습니다(Lasso 0.1092, 구조 모델 0.1103). XGBoost, SVR과 블렌드해서 LB **0.11526**을 얻었습니다.
-- **코너 보정**: IDOTRR 동네이면서 상업지역(`C (all)`)이고 코너 땅인 test 6채만 +10% 했습니다. LB **0.11516**으로 최고 점수입니다.
-- **v4.1과 v5는 기각했습니다.** 구조 모델 계열의 비중이 33%를 넘으면 리더보드가 매번 나빠졌습니다. v5는 채택·기각 점수 기준을 제출 전에 미리 정해 두었습니다.
+- **코너 보정**: IDOTRR 동네이면서 상업지역(`C (all)`)이고 코너 땅인 test 6채만 +10% 했습니다. LB **0.11516**입니다.
+- **v4.1**(IDOTRR 동네를 위한 구조 모델 제약)은 기각했습니다.
+- 스택에서 구조 모델 계열이 33%를 넘는 가중치를 받은 경우(v3.1, v4)에는, 같은 모델을 단순 평균한 것보다 LB가 나빴습니다.
+- **v5**: 구조 모델의 잔차를 Lasso 대신 SVR이 학습하는 두 번째 하이브리드를 추가했습니다. 하이브리드_SVR 단독 CV는 0.1044이고, 모델 4개(XGBoost, SVR, 하이브리드, 하이브리드_SVR)를 단순 평균하면 CV 0.1029입니다. 같은 코너 보정을 적용해서 LB **0.11516**을 얻었습니다. v4 + 코너와 같은 점수입니다.
+  - 제출 전에 판단 기준을 정해 두었습니다: 0.11506 이하면 채택, 0.11507~0.11525면 판단 보류(기존 유지), 0.11526 이상이면 기각.
+  - 최종 제출 파일로는 v5를 사용합니다. [TODO: 같은 점수에서 v4 대신 v5를 고른 이유]
 
 ## 결과
 
@@ -56,9 +60,10 @@
 | 5 | v2 피처 정리, 스택 | 0.1049 | 0.11535 | 채택 |
 | 5 | v3 구조 모델 + 제곱항 | 0.1035 | 0.11713 | 기각 |
 | 5 | v4 하이브리드, 블렌드 | 0.1036 | 0.11526 | 채택 |
-| 5 | **v4 블렌드 + 코너 보정** | – | **0.11516** | **최종** |
+| 5 | v4 블렌드 + 코너 보정 | – | 0.11516 | 채택 |
+| 5 | **v5 모델 4개 블렌드 + 코너 보정** | 0.1029 | **0.11516** | **최종** |
 
-`–`는 test 집에만 적용되는 변경이라 CV로 측정할 수 없다는 뜻입니다. 블렌드(blend)는 가중치를 학습하지 않고 모델 예측을 단순 평균하는 방식입니다.
+`–`는 test 집에만 적용되는 변경이라 CV로 측정할 수 없다는 뜻입니다. v5의 CV는 코너 보정 전 블렌드의 점수입니다. 블렌드(blend)는 가중치를 학습하지 않고 모델 예측을 단순 평균하는 방식입니다.
 
 ## 핵심 발견 / 배운 점
 
@@ -91,13 +96,14 @@ unzip data/house-prices-advanced-regression-techniques.zip -d data
 1. `eda/eda.ipynb` – EDA
 2. `notebooks/01_baseline_and_stack.ipynb` – Step 3~4
 3. `notebooks/02_v2_features.ipynb` – v2
-4. `notebooks/03_v4_hybrid.ipynb` – 최종 모델. 셀 #8이 `submission_v4_blend.csv`를, 셀 #10이 최종 파일 `submission_v4_blend_corner10.csv`를 만듭니다.
+4. `notebooks/03_v4_hybrid.ipynb` – v4. 셀 #10이 `submission_v4_blend_corner10.csv`를 만듭니다.
+5. `notebooks/04_v5_hybrid_svr.ipynb` – 최종 모델. 셀 #8이 `submission_v5_blend_corner10.csv`를 만듭니다. `submissions/final_v5_blend_corner.csv`와 같은 파일입니다.
 
-노트북은 실험 기록으로 쓰기 위해 실행했던 상태 그대로(출력 포함) 두었습니다. `src/`에는 노트북 02~03의 코드를 다시 쓸 수 있게 모듈로 나눠 담았습니다.
+노트북은 실험 기록으로 쓰기 위해 실행했던 상태 그대로(출력 포함) 두었습니다. `src/`에는 노트북 02~04의 코드를 다시 쓸 수 있게 모듈로 나눠 담았습니다.
 
 ```python
 from src.preprocessing import load_data, build
-from src.structure_model import prep_struct, fit_hybrid
+from src.structure_model import prep_struct, fit_hybrid, fit_hybrid_svr
 from src.rules import id2550_rule, corner_adjust
 ```
 
@@ -115,16 +121,17 @@ house-prices-advanced-regression/
 ├── notebooks/
 │   ├── 01_baseline_and_stack.ipynb   # Step 3~4
 │   ├── 02_v2_features.ipynb          # Step 5 v2
-│   └── 03_v4_hybrid.ipynb            # Step 5 v4 (최종)
+│   ├── 03_v4_hybrid.ipynb            # Step 5 v4
+│   └── 04_v5_hybrid_svr.ipynb        # Step 5 v5 (최종)
 ├── src/
 │   ├── preprocessing.py   # 결측 처리, 이상치 제거, 변환
 │   ├── features.py        # 피처 생성
 │   ├── models.py          # 베이스 모델과 하이퍼파라미터
-│   ├── structure_model.py # 원가법 구조 모델, 하이브리드
+│   ├── structure_model.py # 원가법 구조 모델, 하이브리드 (Lasso / SVR)
 │   ├── cv.py              # KFold 평가, 오차 상관, 스택/블렌드 비교
 │   └── rules.py           # Id 2550 규칙, 코너 보정
 ├── docs/
 │   └── experiments.md     # 전체 실험 기록
 └── submissions/
-    └── final_v4_blend_corner.csv
+    └── final_v5_blend_corner.csv
 ```

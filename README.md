@@ -5,7 +5,7 @@ English | [한국어](README.ko.md)
 Predicting house sale prices in Ames, Iowa from 79 features. 
 **Final public leaderboard: 0.11516** (log-price RMSE).
 
-The result came from a blend of three models, a hybrid cost-approach model, and two hand-written rules based on the data. This repository records which changes reached the leaderboard and which did not, and the criteria used to decide.
+The final submission is a blend that averages four models with 1/4 weight each: XGBoost, SVR, and two hybrid models. In a hybrid model, a structure model built on the cost approach used in real-estate appraisal (price = land value + building area × unit cost × quality × depreciation) predicts the price first, and a second model learns only its errors: Lasso in one hybrid, SVR in the other. Two rules made from looking at the data (the Id 2550 special sale and 6 commercial corner lots) are then applied. This repository records which changes reached the leaderboard and which did not, and the criteria used to decide.
 
 ## Problem and metric
 
@@ -38,8 +38,12 @@ Details: [eda/README.md](eda/README.md)
 - **v2 features** (Box-Cox, more ordinal encodings, quality × area, removal of rare dummies). Every change applies to almost every house. Lasso CV went from 0.1117 to 0.1093 (better in 15 of 15 splits), and the stack reached LB **0.11535**.
 - **v3** (squared quality term in the structure model) was rejected at LB 0.11713. The squared term was fitted on few training houses at the extremes, and it was unstable on test.
 - **v4 hybrid**: a cost-approach structure model predicts the price first (land value + building area × unit cost × quality × depreciation), and Lasso learns only its residuals. Hybrid alone: CV 0.1054 (Lasso 0.1092, structure model 0.1103). Blended with XGBoost and SVR, it reached LB **0.11526**.
-- **Corner adjustment**: +10% for the 6 test houses that are in IDOTRR, zoned commercial (`C (all)`), and on a corner lot. LB **0.11516** (best).
-- **v4.1 and v5** were rejected. Whenever the structure-model family had more than 33% of the weight, LB got worse in every case. For v5, the accept/reject thresholds were written down before submitting.
+- **Corner adjustment**: +10% for the 6 test houses that are in IDOTRR, zoned commercial (`C (all)`), and on a corner lot. LB **0.11516**.
+- **v4.1** (a constraint on the structure model for the IDOTRR neighborhood) was rejected.
+- In the stacks that gave the structure-model family more than 33% of the weight (v3.1, v4), LB was worse than a simple average of the same models.
+- **v5**: a second hybrid in which SVR, instead of Lasso, learns the structure model's residuals. Hybrid-SVR alone: CV 0.1044. A simple average of four models (XGBoost, SVR, hybrid, hybrid-SVR) had CV 0.1029. With the same corner adjustment, it scored LB **0.11516**, the same as v4 + corner.
+  - Before submitting, I wrote down the thresholds: ≤ 0.11506 accept, 0.11507–0.11525 undecided (keep the existing version), ≥ 0.11526 reject.
+  - The v5 file is used as the final submission. [TODO: reason for choosing v5 over v4 at the same score]
 
 ## Results
 
@@ -55,9 +59,10 @@ Main versions only. The full log, with all CV and LB numbers and the reason for 
 | 5 | v2 features, stack | 0.1049 | 0.11535 | kept |
 | 5 | v3 structure model with squared term | 0.1035 | 0.11713 | rejected |
 | 5 | v4 hybrid, blend | 0.1036 | 0.11526 | kept |
-| 5 | **v4 blend + corner adjustment** | – | **0.11516** | **final** |
+| 5 | v4 blend + corner adjustment | – | 0.11516 | kept |
+| 5 | **v5 4-model blend + corner adjustment** | 0.1029 | **0.11516** | **final** |
 
-`–` means the change applies only to test houses, so CV cannot measure it. A blend is a simple average of model predictions with no learned weights.
+`–` means the change applies only to test houses, so CV cannot measure it. The CV for v5 is for the blend before the corner adjustment. A blend is a simple average of model predictions with no learned weights.
 
 ## Key findings
 
@@ -90,13 +95,14 @@ Each notebook looks for `/kaggle/input/**/train.csv` first and falls back to `..
 1. `eda/eda.ipynb` – EDA
 2. `notebooks/01_baseline_and_stack.ipynb` – Steps 3–4
 3. `notebooks/02_v2_features.ipynb` – v2
-4. `notebooks/03_v4_hybrid.ipynb` – final model. Cell #8 writes `submission_v4_blend.csv`, and cell #10 writes the final `submission_v4_blend_corner10.csv`.
+4. `notebooks/03_v4_hybrid.ipynb` – v4. Cell #10 writes `submission_v4_blend_corner10.csv`.
+5. `notebooks/04_v5_hybrid_svr.ipynb` – final model. Cell #8 writes `submission_v5_blend_corner10.csv`. This is the same file as `submissions/final_v5_blend_corner.csv`.
 
-The notebooks are kept as they were run, outputs included, as the record of each experiment. `src/` contains the same code from notebooks 02–03, organized into modules for reuse:
+The notebooks are kept as they were run, outputs included, as the record of each experiment. `src/` contains the same code from notebooks 02–04, organized into modules for reuse:
 
 ```python
 from src.preprocessing import load_data, build
-from src.structure_model import prep_struct, fit_hybrid
+from src.structure_model import prep_struct, fit_hybrid, fit_hybrid_svr
 from src.rules import id2550_rule, corner_adjust
 ```
 
@@ -114,16 +120,17 @@ house-prices-advanced-regression/
 ├── notebooks/
 │   ├── 01_baseline_and_stack.ipynb   # Steps 3–4
 │   ├── 02_v2_features.ipynb          # Step 5 v2
-│   └── 03_v4_hybrid.ipynb            # Step 5 v4 (final)
+│   ├── 03_v4_hybrid.ipynb            # Step 5 v4
+│   └── 04_v5_hybrid_svr.ipynb        # Step 5 v5 (final)
 ├── src/
 │   ├── preprocessing.py   # missing values, outlier removal, transforms
 │   ├── features.py        # feature creation
 │   ├── models.py          # base models and hyperparameters
-│   ├── structure_model.py # cost-approach structure model, hybrid
+│   ├── structure_model.py # cost-approach structure model, hybrids (Lasso / SVR)
 │   ├── cv.py              # KFold scoring, error correlation, stack vs blend
 │   └── rules.py           # Id 2550 rule, corner adjustment
 ├── docs/
 │   └── experiments.md     # full experiment log (Korean)
 └── submissions/
-    └── final_v4_blend_corner.csv
+    └── final_v5_blend_corner.csv
 ```

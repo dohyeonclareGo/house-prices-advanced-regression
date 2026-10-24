@@ -1,9 +1,10 @@
-"""원가법 구조 모델과 하이브리드(구조 모델 + Lasso 잔차 보정). notebooks/03의 #4, #6-1."""
+"""원가법 구조 모델과 하이브리드(구조 모델 + Lasso/SVR 잔차 보정). notebooks/03의 #4, #6-1, notebooks/04의 #6-2."""
 import numpy as np
 from scipy.optimize import least_squares
 from sklearn.linear_model import Lasso
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import RobustScaler
+from sklearn.svm import SVR
 
 Q = {'None': 0, 'Po': 1, 'Fa': 2, 'TA': 3, 'Gd': 4, 'Ex': 5}
 SALE = ['Abnorml', 'Family', 'Alloca', 'Partial', 'AdjLand']
@@ -135,6 +136,17 @@ def fit_hybrid(S_tr, X_tr, y_tr, w_tr, nbs, opts=V4):
     return sm, lm
 
 
+def make_svr_resid():
+    return make_pipeline(RobustScaler(), SVR(C=5, epsilon=0.008, gamma=0.0005))
+
+
+def fit_hybrid_svr(S_tr, X_tr, y_tr, nbs, opts=V4):
+    """[v5] 하이브리드_SVR: 구조 모델의 잔차를 Lasso 대신 SVR이 학습 (샘플 가중치 없음)."""
+    sm = StructModel(nbs, opts).fit(S_tr, y_tr)
+    rm = make_svr_resid().fit(X_tr, y_tr - sm.predict(S_tr))
+    return sm, rm
+
+
 def predict_hybrid(sm, lm, S, X):
     return sm.predict(S) + lm.predict(X)
 
@@ -144,4 +156,12 @@ def hybrid_oof(S_train, X, y, w, nbs, cv, opts=V4):
     for tr_i, va_i in cv.split(X):
         sm, lm = fit_hybrid(S_train.iloc[tr_i], X.iloc[tr_i], y[tr_i], w[tr_i], nbs, opts)
         o[va_i] = predict_hybrid(sm, lm, S_train.iloc[va_i], X.iloc[va_i])
+    return o
+
+
+def hybrid_svr_oof(S_train, X, y, nbs, cv, opts=V4):
+    o = np.zeros(len(y))
+    for tr_i, va_i in cv.split(X):
+        sm, rm = fit_hybrid_svr(S_train.iloc[tr_i], X.iloc[tr_i], y[tr_i], nbs, opts)
+        o[va_i] = predict_hybrid(sm, rm, S_train.iloc[va_i], X.iloc[va_i])
     return o
