@@ -24,9 +24,9 @@ Details: [eda/README.md](eda/README.md)
 
 ## Approach
 
-### Step 3 – Baseline: start simple, then add a model that makes different errors
-- Lasso alone: LB 0.12558. Blending Lasso and XGBoost 50/50: LB 0.12427. A linear model and a tree model make mistakes on different houses.
-- **Id 2550 rule**: every model predicted Id 2550 as a large, expensive house. I fixed its prediction to the mean log price of 524 and 1299. This rule for one house moved LB from 0.12427 to **0.11876**.
+### Step 3 – Baseline: start simple, then add a model with different strengths
+- Lasso alone scored LB 0.12558; a 50:50 blend of Lasso and XGBoost scored LB 0.12427. Linear and tree models make their largest errors on different houses, so averaging the two predictions reduces the large errors of each.
+- **Id 2550 rule**: In train, Id 524 and 1299 have over 4,000 sq ft of above-ground living area but sold far below what their size suggests, because they were Partial sales (sold before construction was complete). These two houses were removed from training as outliers. As a result, the models learned only that larger houses cost more, and every model predicted a very high price for Id 2550, the one test house with the same profile (over 4,000 sq ft and a Partial sale). The prediction for this house was therefore fixed to the mean log price of 524 and 1299. This single-house rule improved the LB from 0.12427 to **0.11876**.
 
 ### Step 4 – Upgrade: CV improved, the leaderboard did not
 - A Lasso + XGBoost + SVR **stack** reached LB **0.11660**. A stack is a meta-model that learns how much weight to give each model's OOF predictions; OOF (out-of-fold) predictions are predictions for each training house made by a model that did not see that house.
